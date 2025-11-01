@@ -36,9 +36,9 @@ echo ""
 
 # Check cert-manager
 echo -e "${YELLOW}cert-manager:${NC}"
-check "Namespace exists" "kubectl get namespace certmanager-system"
-check "Deployment ready" "kubectl get deployment -n certmanager-system cert-manager -o jsonpath='{.status.readyReplicas}' | grep -q '[1-9]'"
-check "Pods running" "kubectl get pods -n certmanager-system --field-selector=status.phase=Running | grep -q cert-manager"
+check "Namespace exists" "kubectl get namespace cert-manager"
+check "Deployment ready" "kubectl get deployment -n cert-manager cert-manager -o jsonpath='{.status.readyReplicas}' | grep -q '[1-9]'"
+check "Pods running" "kubectl get pods -n cert-manager --field-selector=status.phase=Running | grep -q cert-manager"
 echo ""
 
 # Check MetalLB

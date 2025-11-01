@@ -8,14 +8,9 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 CERT_MANAGER_VERSION="${CERT_MANAGER_VERSION:-v1.13.2}"
-NAMESPACE="certmanager-system"
+NAMESPACE="cert-manager"
 
 echo -e "${GREEN}==> Installing cert-manager${NC}"
-
-# Add Bitnami Helm repository
-echo "Adding Bitnami Helm repository..."
-helm repo add bitnami https://charts.bitnami.com/bitnami 2>/dev/null || true
-helm repo update
 
 # Check if already installed
 if kubectl get namespace "${NAMESPACE}" &>/dev/null; then
@@ -26,21 +21,16 @@ if kubectl get namespace "${NAMESPACE}" &>/dev/null; then
     fi
 fi
 
-# Install cert-manager
-echo "Installing cert-manager via Helm..."
-helm upgrade --install cert-manager bitnami/cert-manager \
-    --namespace "${NAMESPACE}" \
-    --create-namespace \
-    --set "installCRDs=true" \
-    --wait \
-    --timeout 5m
+# Install cert-manager using official manifests (uses quay.io registry)
+echo "Installing cert-manager ${CERT_MANAGER_VERSION} from official manifests..."
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml
 
 # Wait for cert-manager to be ready
 echo -e "${GREEN}Waiting for cert-manager pods to be ready...${NC}"
 kubectl wait --for=condition=Ready pods \
     --all \
     -n "${NAMESPACE}" \
-    --timeout=180s
+    --timeout=300s
 
 # Verify webhook is functional
 echo -e "${GREEN}Verifying cert-manager webhook...${NC}"

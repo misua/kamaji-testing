@@ -32,33 +32,33 @@ ERROR: failed to create cluster: ...
   lsof -i :6443
   ```
 
-### 2. cert-manager Installation Hangs
+### 2. cert-manager Installation Issues
 
 **Symptom:**
 ```
-Waiting for cert-manager pods to be ready...
-(hangs indefinitely)
+ImagePullBackOff or timeout errors
 ```
 
 **Solutions:**
 
 - **Check pod status:**
   ```bash
-  kubectl get pods -n certmanager-system
-  kubectl describe pod -n certmanager-system <pod-name>
+  kubectl get pods -n cert-manager
+  kubectl describe pod -n cert-manager <pod-name>
   ```
 
 - **Check events:**
   ```bash
-  kubectl get events -n certmanager-system --sort-by='.lastTimestamp'
+  kubectl get events -n cert-manager --sort-by='.lastTimestamp'
   ```
 
 - **Reinstall cert-manager:**
   ```bash
-  helm uninstall cert-manager -n certmanager-system
-  kubectl delete namespace certmanager-system
+  kubectl delete namespace cert-manager
   ./scripts/02-install-cert-manager.sh
   ```
+
+**Note:** The script uses official cert-manager manifests from quay.io (not Docker Hub) to avoid rate limiting issues.
 
 ### 3. MetalLB IP Pool Issues
 
@@ -282,8 +282,8 @@ kubectl describe node
 
 ```bash
 # cert-manager
-kubectl get pods -n certmanager-system
-kubectl logs -n certmanager-system -l app.kubernetes.io/name=cert-manager
+kubectl get pods -n cert-manager
+kubectl logs -n cert-manager -l app.kubernetes.io/name=cert-manager
 
 # MetalLB
 kubectl get pods -n metallb-system

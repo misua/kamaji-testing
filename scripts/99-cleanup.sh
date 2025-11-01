@@ -14,6 +14,7 @@ echo ""
 echo "This will delete:"
 echo "  - kind cluster '${CLUSTER_NAME}'"
 echo "  - All tenant control planes"
+echo "  - Worker VMs (if any)"
 echo "  - All associated resources"
 echo ""
 
@@ -22,6 +23,14 @@ echo
 if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
     echo "Cleanup cancelled"
     exit 0
+fi
+
+# Clean up worker VMs first
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "${SCRIPT_DIR}/08-cleanup-workers.sh" ]; then
+    echo -e "${GREEN}Cleaning up worker VMs...${NC}"
+    "${SCRIPT_DIR}/08-cleanup-workers.sh"
+    echo ""
 fi
 
 # Delete kind cluster

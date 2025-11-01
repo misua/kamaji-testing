@@ -40,12 +40,12 @@ Kamaji is a Kubernetes Control Plane Manager that runs control plane components 
 - k3d: Lightweight but less documentation for Kamaji use case
 - Docker Desktop Kubernetes: Limited configurability
 
-### Decision 2: Use Bitnami cert-manager Helm chart
-**Why:** Kamaji documentation references Bitnami charts, provides consistent installation method.
+### Decision 2: Use official cert-manager manifests
+**Why:** Official manifests use quay.io registry (avoiding Docker Hub rate limits), simpler installation, and are the standard recommended approach.
 
 **Alternatives considered:**
-- Official cert-manager manifests: More complex, manual CRD management
-- Jetstack Helm chart: Similar but Bitnami is in official docs
+- Bitnami Helm chart: Uses Docker Hub which has rate limiting issues
+- Jetstack Helm chart: Deprecated in favor of official manifests
 
 ### Decision 3: MetalLB for LoadBalancer support
 **Why:** Required for exposing tenant control planes with LoadBalancer service type. MetalLB is the standard solution for bare-metal/kind environments.

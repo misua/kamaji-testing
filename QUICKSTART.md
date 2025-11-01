@@ -123,12 +123,86 @@ kubectl get all -A
 
 ---
 
+## Step 6: Explore Multi-Tenancy (Optional)
+
+Deploy resources to each environment to see complete isolation:
+
+```bash
+# Deploy to DEV
+export KUBECONFIG=./kubeconfigs/tcp-dev.kubeconfig
+kubectl create namespace demo
+kubectl create deployment nginx --image=nginx:alpine -n demo
+kubectl get all -n demo
+
+# Deploy to STAGING
+export KUBECONFIG=./kubeconfigs/tcp-staging.kubeconfig
+kubectl create namespace demo
+kubectl create deployment nginx --image=nginx:alpine --replicas=2 -n demo
+kubectl get all -n demo
+
+# Deploy to PROD
+export KUBECONFIG=./kubeconfigs/tcp-prod.kubeconfig
+kubectl create namespace demo
+kubectl create deployment nginx --image=nginx:alpine --replicas=3 -n demo
+kubectl get all -n demo
+```
+
+### Verify Complete Isolation
+
+Each cluster is completely isolated - resources in one don't affect the others:
+
+```bash
+# Check DEV
+export KUBECONFIG=./kubeconfigs/tcp-dev.kubeconfig
+kubectl get namespaces
+kubectl get deployments -A
+
+# Check STAGING (different resources)
+export KUBECONFIG=./kubeconfigs/tcp-staging.kubeconfig
+kubectl get namespaces
+kubectl get deployments -A
+
+# Check PROD (different resources)
+export KUBECONFIG=./kubeconfigs/tcp-prod.kubeconfig
+kubectl get namespaces
+kubectl get deployments -A
+```
+
+### Understanding Control Planes vs Worker Nodes
+
+**Important:** These tenant clusters are **control planes only** - they don't have worker nodes yet. This means:
+
+- ✅ You can create resources (deployments, services, etc.)
+- ✅ The API server accepts and stores them
+- ✅ Each cluster is completely isolated
+- ❌ Pods will stay in "Pending" state (no nodes to schedule on)
+
+To see this:
+
+```bash
+export KUBECONFIG=./kubeconfigs/tcp-dev.kubeconfig
+
+# No nodes (control plane only)
+kubectl get nodes
+
+# Pods are pending (no nodes to run on)
+kubectl get pods -n demo
+
+# But the deployment exists
+kubectl get deployment -n demo
+```
+
+**This demonstrates Kamaji's multi-tenancy perfectly** - each tenant gets their own isolated Kubernetes API and control plane. Adding worker nodes is covered in the advanced documentation.
+
+---
+
 ## What You Have Now
 
 ✅ **Management Cluster:** kind cluster running on Docker  
 ✅ **3 Tenant Control Planes:** Isolated Kubernetes control planes (dev, staging, prod)  
 ✅ **LoadBalancer IPs:** Each tenant has its own IP address  
 ✅ **Kubeconfigs:** Access credentials for each tenant cluster  
+✅ **Demo Apps:** Nginx deployments with unique content per environment  
 
 ---
 
