@@ -1,0 +1,29 @@
+apiVersion: kamaji.clastix.io/v1alpha1
+kind: TenantControlPlane
+metadata:
+  name: tcp-staging
+  namespace: default
+spec:
+  controlPlane:
+    deployment:
+      replicas: 1
+      additionalMetadata:
+        labels:
+          environment: staging
+    service:
+      additionalMetadata:
+        labels:
+          environment: staging
+      serviceType: LoadBalancer
+  kubernetes:
+    version: "v1.28.0"
+    kubelet:
+      cgroupfs: systemd
+    admissionControllers:
+    - ResourceQuota
+    - LimitRanger
+  networkProfile:
+    port: 6443
+  addons:
+    coreDNS: {}
+    kubeProxy: {}
