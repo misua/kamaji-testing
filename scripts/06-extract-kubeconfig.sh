@@ -53,7 +53,35 @@ mkdir -p "${OUTPUT_DIR}"
 
 # Extract kubeconfig
 echo "Extracting kubeconfig..."
-kubectl get secret "${SECRET_NAME}" -o jsonpath='{.data.admin\.conf}' | base64 -d > "${OUTPUT_FILE}"
+kubectl get secret "${SECRET_NAME}" -o jsonpath='{.data.admin\.conf}' | base64 -d > "${OUTPUT_FILE}.tmp"
+
+# Get LoadBalancer IP
+LB_IP=$(kubectl get svc -l "kamaji.clastix.io/name=${TCP_NAME}" -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}')
+
+# Map tenant to host port
+case "${TCP_NAME}" in
+    tcp-dev)
+        HOST_PORT=6443
+        ;;
+    tcp-staging)
+        HOST_PORT=6444
+        ;;
+    tcp-prod)
+        HOST_PORT=6445
+        ;;
+    *)
+        echo -e "${YELLOW}Warning: Unknown tenant, using LoadBalancer IP${NC}"
+        mv "${OUTPUT_FILE}.tmp" "${OUTPUT_FILE}"
+        echo -e "${GREEN}✓ Kubeconfig saved to: ${OUTPUT_FILE}${NC}"
+        exit 0
+        ;;
+esac
+
+# Replace LoadBalancer IP with host IP and port
+HOST_IP="192.168.121.1"
+echo "Updating server address: ${LB_IP}:6443 -> ${HOST_IP}:${HOST_PORT}"
+sed "s|https://${LB_IP}:6443|https://${HOST_IP}:${HOST_PORT}|g" "${OUTPUT_FILE}.tmp" > "${OUTPUT_FILE}"
+rm "${OUTPUT_FILE}.tmp"
 
 echo -e "${GREEN}✓ Kubeconfig saved to: ${OUTPUT_FILE}${NC}"
 echo ""
