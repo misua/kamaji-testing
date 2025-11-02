@@ -70,9 +70,9 @@ done
 # Patch services to use specific NodePorts
 echo ""
 echo -e "${GREEN}Configuring NodePorts for external access...${NC}"
-kubectl patch svc -l "kamaji.clastix.io/name=tcp-dev" -p '{"spec":{"ports":[{"port":6443,"nodePort":30001}]}}' 2>/dev/null || echo "tcp-dev service not found yet"
-kubectl patch svc -l "kamaji.clastix.io/name=tcp-staging" -p '{"spec":{"ports":[{"port":6443,"nodePort":30002}]}}' 2>/dev/null || echo "tcp-staging service not found yet"
-kubectl patch svc -l "kamaji.clastix.io/name=tcp-prod" -p '{"spec":{"ports":[{"port":6443,"nodePort":30003}]}}' 2>/dev/null || echo "tcp-prod service not found yet"
+kubectl patch svc tcp-dev -p '{"spec":{"ports":[{"port":6443,"protocol":"TCP","targetPort":6443,"nodePort":30001}]}}' 2>/dev/null || echo "tcp-dev service not ready yet"
+kubectl patch svc tcp-staging -p '{"spec":{"ports":[{"port":6443,"protocol":"TCP","targetPort":6443,"nodePort":30002}]}}' 2>/dev/null || echo "tcp-staging service not ready yet"
+kubectl patch svc tcp-prod -p '{"spec":{"ports":[{"port":6443,"protocol":"TCP","targetPort":6443,"nodePort":30003}]}}' 2>/dev/null || echo "tcp-prod service not ready yet"
 
 echo ""
 echo -e "${GREEN}✓ All tenant control planes deployed${NC}"
