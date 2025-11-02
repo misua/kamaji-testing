@@ -15,7 +15,6 @@ spec:
         labels:
           environment: prod
       serviceType: NodePort
-      nodePort: 30003
   kubernetes:
     version: "v1.28.0"
     kubelet:

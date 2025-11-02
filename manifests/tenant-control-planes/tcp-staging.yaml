@@ -15,7 +15,6 @@ spec:
         labels:
           environment: staging
       serviceType: NodePort
-      nodePort: 30002
   kubernetes:
     version: "v1.28.0"
     kubelet:
