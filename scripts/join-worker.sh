@@ -48,13 +48,13 @@ vagrant upload "${KUBECONFIG}" /tmp/kubelet.conf "${WORKER_NAME}"
 
 # Configure kubelet on the worker
 echo "==> Configuring kubelet..."
-vagrant ssh "${WORKER_NAME}" -c "sudo bash -s" <<EOSSH
+vagrant ssh "${WORKER_NAME}" -c "sudo bash -s" <<'EOSSH'
 # Add route to reach kind cluster network
 KIND_NETWORK="172.18.0.0/16"
-HOST_IP="\$(ip route | grep default | awk '{print \$3}')"
-if ! ip route | grep -q "\${KIND_NETWORK}"; then
-    echo "Adding route to kind network via \${HOST_IP}"
-    ip route add \${KIND_NETWORK} via \${HOST_IP}
+HOST_IP=$(ip route | grep default | awk '{print $3}')
+if ! ip route | grep -q "${KIND_NETWORK}"; then
+    echo "Adding route to kind network via ${HOST_IP}"
+    ip route add ${KIND_NETWORK} via ${HOST_IP} || echo "Route may already exist"
 fi
 
 # Move kubeconfig to proper location
