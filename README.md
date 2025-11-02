@@ -21,41 +21,12 @@ vagrant --version     # Need 2.2.0+ (for worker nodes)
 
 ---
 
-## 🚀 Setup (Copy & Paste)
+## 🚀 Quick Setup
 
-### Step 1: Install Management Cluster
-
-```bash
-# Run the main setup (creates kind cluster + Kamaji + 3 tenant control planes)
-./scripts/setup.sh
-```
-
-**Takes:** 10-15 minutes  
-**Creates:** tcp-dev, tcp-staging, tcp-prod control planes
-
-### Step 2: Verify Installation
+### Option 1: Full Setup (Recommended)
 
 ```bash
-./scripts/verify.sh
-```
-
-**Expected:** All green ✓ checks
-
-### Step 3: Extract Kubeconfigs
-
-```bash
-# Get access credentials for each tenant
-./scripts/06-extract-kubeconfig.sh tcp-dev
-./scripts/06-extract-kubeconfig.sh tcp-staging
-./scripts/06-extract-kubeconfig.sh tcp-prod
-```
-
-**Output:** `scripts/kubeconfigs/tcp-{env}.kubeconfig`
-
-### Step 4: Add Worker Nodes (NEW!)
-
-```bash
-# Install prerequisites for worker VMs
+# Install worker node prerequisites first
 sudo apt-get install vagrant libvirt-dev qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils
 vagrant plugin install vagrant-libvirt
 sudo systemctl start libvirtd
@@ -64,19 +35,30 @@ sudo systemctl start libvirtd
 sudo sysctl fs.inotify.max_user_instances=512
 sudo sysctl fs.inotify.max_user_watches=524288
 
-# Create worker VMs (one per tenant)
-vagrant up --provider=libvirt
+# Run complete setup (everything automated)
+./scripts/setup.sh
+```
 
-# Join workers to control planes
-for tenant in dev staging prod; do
-  ./scripts/join-worker.sh ${tenant}
-done
+**Takes:** 20-25 minutes  
+**Creates:**
+- kind cluster with Kamaji
+- 3 tenant control planes (tcp-dev, tcp-staging, tcp-prod)
+- Kubeconfigs extracted automatically
+- 3 worker VMs joined to control planes
+
+### Option 2: Skip Worker Nodes
+
+```bash
+# Setup without worker VMs (control planes only)
+./scripts/setup.sh --skip-workers
 ```
 
 **Takes:** 10-15 minutes  
-**Creates:** 3 VMs (tcp-dev-worker, tcp-staging-worker, tcp-prod-worker)
+**Note:** You can add workers later using [WORKER-SETUP.md](WORKER-SETUP.md)
 
-### Step 5: Verify Workers Joined
+---
+
+## ✅ Verify Installation
 
 ```bash
 # Check nodes are Ready
@@ -89,7 +71,9 @@ done
 
 **Expected:** Each cluster shows one worker node in "Ready" state
 
-### Step 6: Deploy Demo Apps
+---
+
+## 🎯 Deploy Demo Apps
 
 ```bash
 # Deploy nginx to all environments
@@ -109,7 +93,7 @@ for env in dev staging prod; do
 done
 ```
 
-### Step 7: Access Applications
+## 🌐 Access Applications
 
 ```bash
 # Use the EXTERNAL-IP from step 6
