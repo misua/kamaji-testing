@@ -28,19 +28,9 @@ if kind get clusters 2>/dev/null | grep -q "^${CLUSTER_NAME}$"; then
     fi
 fi
 
-# Create kind cluster with config
+# Create kind cluster
 echo "Creating new kind cluster..."
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "${SCRIPT_DIR}")"
-KIND_CONFIG="${PROJECT_ROOT}/kind-config.yaml"
-
-if [ -f "${KIND_CONFIG}" ]; then
-    echo "Using kind config: ${KIND_CONFIG}"
-    kind create cluster --name "${CLUSTER_NAME}" --config "${KIND_CONFIG}" --wait 2m
-else
-    echo "No kind config found, using defaults"
-    kind create cluster --name "${CLUSTER_NAME}" --wait 2m
-fi
+kind create cluster --name "${CLUSTER_NAME}" --wait 2m
 
 # Verify cluster is ready
 echo -e "${GREEN}Verifying cluster readiness...${NC}"

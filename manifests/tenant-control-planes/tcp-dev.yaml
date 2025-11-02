@@ -14,7 +14,7 @@ spec:
       additionalMetadata:
         labels:
           environment: dev
-      serviceType: NodePort
+      serviceType: LoadBalancer
   kubernetes:
     version: "v1.28.0"
     kubelet:

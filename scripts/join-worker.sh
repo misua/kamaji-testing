@@ -18,7 +18,19 @@ if [ ! -f "${KUBECONFIG}" ]; then
     exit 1
 fi
 
-# Map tenant to host port
+# Get LoadBalancer IP from service
+TCP_NAME="tcp-${TENANT}"
+LB_IP=$(kubectl get svc -l "kamaji.clastix.io/name=${TCP_NAME}" -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+
+if [ -z "${LB_IP}" ]; then
+    echo "Error: Could not get LoadBalancer IP for ${TCP_NAME}"
+    echo "Check service status: kubectl get svc -l 'kamaji.clastix.io/name=${TCP_NAME}'"
+    exit 1
+fi
+
+echo "LoadBalancer IP: ${LB_IP}"
+
+# Map tenant to unique host port
 case "${TENANT}" in
     dev)
         HOST_PORT=6443
@@ -35,11 +47,24 @@ case "${TENANT}" in
         ;;
 esac
 
-# Get host IP that VMs can reach (first default gateway from VM perspective)
-HOST_IP="192.168.121.1"  # libvirt default network gateway
+# Get host IP that VMs can reach (libvirt default gateway)
+HOST_IP="192.168.121.1"
 CP_ENDPOINT="${HOST_IP}:${HOST_PORT}"
 
 echo "Control plane endpoint: https://${CP_ENDPOINT}"
+
+# Set up iptables DNAT rule to forward host port to LoadBalancer IP
+echo "==> Setting up port forwarding (host:${HOST_PORT} -> ${LB_IP}:6443)..."
+sudo iptables --table nat --check PREROUTING \
+    --match addrtype --dst-type LOCAL \
+    --protocol tcp --match tcp --dport ${HOST_PORT} \
+    --jump DNAT --to-destination ${LB_IP}:6443 2>/dev/null || \
+sudo iptables --table nat --append PREROUTING \
+    --match addrtype --dst-type LOCAL \
+    --protocol tcp --match tcp --dport ${HOST_PORT} \
+    --jump DNAT --to-destination ${LB_IP}:6443
+
+echo "✓ Port forwarding configured"
 
 # Get the VM's IP address
 VM_IP=$(vagrant ssh "${WORKER_NAME}" -c "hostname -I | awk '{print \$2}'" 2>/dev/null | tr -d '\r')
