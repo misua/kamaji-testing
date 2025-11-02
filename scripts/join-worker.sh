@@ -18,13 +18,28 @@ if [ ! -f "${KUBECONFIG}" ]; then
     exit 1
 fi
 
-# Get control plane endpoint
-CP_ENDPOINT=$(kubectl --kubeconfig="${KUBECONFIG}" cluster-info 2>/dev/null | \
-    grep "Kubernetes control plane" | \
-    sed 's/\x1b\[[0-9;]*m//g' | \
-    awk '{print $NF}')
+# Map tenant to host port
+case "${TENANT}" in
+    dev)
+        HOST_PORT=6443
+        ;;
+    staging)
+        HOST_PORT=6444
+        ;;
+    prod)
+        HOST_PORT=6445
+        ;;
+    *)
+        echo "Error: Unknown tenant ${TENANT}"
+        exit 1
+        ;;
+esac
 
-echo "Control plane endpoint: ${CP_ENDPOINT}"
+# Get host IP that VMs can reach (first default gateway from VM perspective)
+HOST_IP="192.168.121.1"  # libvirt default network gateway
+CP_ENDPOINT="${HOST_IP}:${HOST_PORT}"
+
+echo "Control plane endpoint: https://${CP_ENDPOINT}"
 
 # Get the VM's IP address
 VM_IP=$(vagrant ssh "${WORKER_NAME}" -c "hostname -I | awk '{print \$2}'" 2>/dev/null | tr -d '\r')
@@ -36,12 +51,6 @@ fi
 
 echo "Worker VM IP: ${VM_IP}"
 
-# Enable IP forwarding on host (needed for routing)
-if [ "$(sysctl -n net.ipv4.ip_forward)" != "1" ]; then
-    echo "==> Enabling IP forwarding on host..."
-    sudo sysctl -w net.ipv4.ip_forward=1 > /dev/null
-fi
-
 # Copy kubeconfig to VM
 echo "==> Copying kubeconfig to worker..."
 vagrant upload "${KUBECONFIG}" /tmp/kubelet.conf "${WORKER_NAME}"
@@ -49,14 +58,6 @@ vagrant upload "${KUBECONFIG}" /tmp/kubelet.conf "${WORKER_NAME}"
 # Configure kubelet on the worker
 echo "==> Configuring kubelet..."
 vagrant ssh "${WORKER_NAME}" -c "sudo bash -s" <<'EOSSH'
-# Add route to reach kind cluster network
-KIND_NETWORK="172.18.0.0/16"
-HOST_IP=$(ip route | grep "^default" | head -1 | awk '{print $3}')
-if ! ip route | grep -q "${KIND_NETWORK}"; then
-    echo "Adding route to kind network via ${HOST_IP}"
-    ip route add ${KIND_NETWORK} via ${HOST_IP} 2>/dev/null || echo "Route may already exist"
-fi
-
 # Move kubeconfig to proper location
 mkdir -p /etc/kubernetes
 mv /tmp/kubelet.conf /etc/kubernetes/kubelet.conf

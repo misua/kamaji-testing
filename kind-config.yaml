@@ -1,0 +1,18 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  extraPortMappings:
+  # Expose tenant control plane API servers on host
+  # tcp-dev: 6443 -> 30001
+  - containerPort: 30001
+    hostPort: 6443
+    protocol: TCP
+  # tcp-staging: 6443 -> 30002
+  - containerPort: 30002
+    hostPort: 6444
+    protocol: TCP
+  # tcp-prod: 6443 -> 30003
+  - containerPort: 30003
+    hostPort: 6445
+    protocol: TCP
