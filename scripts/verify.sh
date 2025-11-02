@@ -52,7 +52,8 @@ echo ""
 # Check Kamaji
 echo -e "${YELLOW}Kamaji:${NC}"
 check "Namespace exists" "kubectl get namespace kamaji-system"
-check "Controller ready" "kubectl get deployment -n kamaji-system kamaji-controller-manager -o jsonpath='{.status.readyReplicas}' | grep -q '[1-9]'"
+check "Controller ready" "kubectl get deployment -n kamaji-system kamaji -o jsonpath='{.status.readyReplicas}' | grep -q '[1-9]'"
+check "etcd ready" "kubectl get statefulset -n kamaji-system kamaji-etcd -o jsonpath='{.status.readyReplicas}' | grep -q '[3]'"
 check "CRDs installed" "kubectl get crd tenantcontrolplanes.kamaji.clastix.io"
 echo ""
 
