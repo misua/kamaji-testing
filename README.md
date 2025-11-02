@@ -1,231 +1,217 @@
-# Kamaji Local Setup with Kind
+# Kamaji Local Setup - Complete Guide
 
-A complete local development environment for [Kamaji](https://kamaji.clastix.io/) - a Kubernetes Control Plane Manager that enables multi-tenant Kubernetes clusters.
+Multi-tenant Kubernetes using [Kamaji](https://kamaji.clastix.io/) with worker nodes for running actual workloads.
 
-## Quick Start
+**Time to complete:** 20-25 minutes
 
-### Prerequisites
+---
 
-Ensure you have the following installed:
-- Docker 20.10+
-- kind 0.20.0+
-- Helm 3.12.0+
-- kubectl 1.28.0+
-
-See [docs/PREREQUISITES.md](docs/PREREQUISITES.md) for detailed requirements.
-
-### Installation
-
-Run the automated setup script:
+## 📋 Prerequisites
 
 ```bash
+# Check you have these installed:
+docker --version      # Need 20.10+
+kind --version        # Need 0.20.0+
+helm version          # Need 3.12.0+
+kubectl version       # Need 1.28.0+
+vagrant --version     # Need 2.2.0+ (for worker nodes)
+```
+
+**Missing tools?** See [docs/PREREQUISITES.md](docs/PREREQUISITES.md)
+
+---
+
+## 🚀 Setup (Copy & Paste)
+
+### Step 1: Install Management Cluster
+
+```bash
+# Run the main setup (creates kind cluster + Kamaji + 3 tenant control planes)
 ./scripts/setup.sh
 ```
 
-This will:
-1. Create a kind cluster named "kamaji"
-2. Install cert-manager for TLS certificates
-3. Install MetalLB for LoadBalancer support
-4. Install the Kamaji operator
-5. Deploy three tenant control planes (dev, staging, prod)
+**Takes:** 10-15 minutes  
+**Creates:** tcp-dev, tcp-staging, tcp-prod control planes
 
-**Estimated time:** 10-15 minutes
-
-### Verify Installation
+### Step 2: Verify Installation
 
 ```bash
 ./scripts/verify.sh
 ```
 
-### Access Tenant Clusters
+**Expected:** All green ✓ checks
 
-Extract kubeconfig for each tenant:
+### Step 3: Extract Kubeconfigs
 
 ```bash
-# Dev environment
+# Get access credentials for each tenant
 ./scripts/06-extract-kubeconfig.sh tcp-dev
-export KUBECONFIG=./kubeconfigs/tcp-dev.kubeconfig
-kubectl get nodes
-
-# Staging environment
 ./scripts/06-extract-kubeconfig.sh tcp-staging
-export KUBECONFIG=./kubeconfigs/tcp-staging.kubeconfig
-kubectl get nodes
-
-# Prod environment
 ./scripts/06-extract-kubeconfig.sh tcp-prod
-export KUBECONFIG=./kubeconfigs/tcp-prod.kubeconfig
-kubectl get nodes
 ```
 
-## Architecture
+**Output:** `scripts/kubeconfigs/tcp-{env}.kubeconfig`
 
-```
-Docker Host
-└── kind Cluster (Management)
-    ├── Kamaji Operator
-    ├── cert-manager
-    ├── MetalLB
-    └── Tenant Control Planes (3 clusters)
-        ├── tcp-dev (LoadBalancer IP: x.x.x.200)
-        │   ├── API Server (pod)
-        │   ├── Controller Manager (pod)
-        │   ├── Scheduler (pod)
-        │   └── etcd (pod)
-        ├── tcp-staging (LoadBalancer IP: x.x.x.201)
-        │   └── ... (same components)
-        └── tcp-prod (LoadBalancer IP: x.x.x.202)
-            └── ... (same components)
-```
-
-## What is Kamaji?
-
-Kamaji is a Kubernetes Control Plane Manager that:
-- Runs Kubernetes control planes as pods within a management cluster
-- Enables multi-tenancy with isolated control planes
-- Reduces operational overhead and resource consumption
-- Provides a lightweight alternative to dedicated control plane VMs
-
-## Directory Structure
-
-```
-.
-├── scripts/                    # Automation scripts
-│   ├── setup.sh               # Master setup script
-│   ├── 01-create-kind-cluster.sh
-│   ├── 02-install-cert-manager.sh
-│   ├── 03-install-metallb.sh
-│   ├── 04-install-kamaji.sh
-│   ├── 05-deploy-tenant-control-planes.sh
-│   ├── 06-extract-kubeconfig.sh
-│   ├── verify.sh              # Verification script
-│   └── 99-cleanup.sh          # Cleanup script
-├── manifests/
-│   └── tenant-control-planes/ # TCP manifests
-│       ├── tcp-dev.yaml
-│       ├── tcp-staging.yaml
-│       └── tcp-prod.yaml
-├── docs/                      # Documentation
-│   ├── PREREQUISITES.md
-│   └── TROUBLESHOOTING.md
-└── README.md                  # This file
-```
-
-## Common Tasks
-
-### View Tenant Control Planes
+### Step 4: Add Worker Nodes (NEW!)
 
 ```bash
-kubectl get tenantcontrolplanes
-kubectl describe tenantcontrolplane tcp-dev
+# Install prerequisites for worker VMs
+sudo apt-get install vagrant libvirt-dev qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils
+vagrant plugin install vagrant-libvirt
+sudo systemctl start libvirtd
+
+# Fix file limits (prevents "too many open files" error)
+sudo sysctl fs.inotify.max_user_instances=512
+sudo sysctl fs.inotify.max_user_watches=524288
+
+# Create worker VMs (one per tenant)
+vagrant up --provider=libvirt
+
+# Join workers to control planes
+for tenant in dev staging prod; do
+  ./scripts/join-worker.sh ${tenant}
+done
 ```
 
-### View Services and IPs
+**Takes:** 10-15 minutes  
+**Creates:** 3 VMs (tcp-dev-worker, tcp-staging-worker, tcp-prod-worker)
+
+### Step 5: Verify Workers Joined
 
 ```bash
-kubectl get svc -l 'kamaji.clastix.io/name'
+# Check nodes are Ready
+for env in dev staging prod; do
+  echo "=== tcp-${env} ==="
+  kubectl --kubeconfig=scripts/kubeconfigs/tcp-${env}.kubeconfig get nodes
+  echo ""
+done
 ```
 
-### Check Component Status
+**Expected:** Each cluster shows one worker node in "Ready" state
+
+### Step 6: Deploy Demo Apps
 
 ```bash
-# cert-manager
-kubectl get pods -n certmanager-system
+# Deploy nginx to all environments
+kubectl --kubeconfig=scripts/kubeconfigs/tcp-dev.kubeconfig apply -f manifests/examples/nginx-dev.yaml
+kubectl --kubeconfig=scripts/kubeconfigs/tcp-staging.kubeconfig apply -f manifests/examples/nginx-staging.yaml
+kubectl --kubeconfig=scripts/kubeconfigs/tcp-prod.kubeconfig apply -f manifests/examples/nginx-prod.yaml
 
-# MetalLB
-kubectl get pods -n metallb-system
+# Wait for pods to run
+kubectl --kubeconfig=scripts/kubeconfigs/tcp-dev.kubeconfig get pods -n demo -w
+# Press Ctrl+C when Running
 
-# Kamaji
-kubectl get pods -n kamaji-system
-
-# Tenant control planes
-kubectl get pods -l 'kamaji.clastix.io/component=control-plane'
+# Get LoadBalancer IPs
+for env in dev staging prod; do
+  echo "=== tcp-${env} ==="
+  kubectl --kubeconfig=scripts/kubeconfigs/tcp-${env}.kubeconfig get svc -n demo
+  echo ""
+done
 ```
 
-### Create Additional Tenant
-
-1. Copy an existing manifest:
-   ```bash
-   cp manifests/tenant-control-planes/tcp-dev.yaml manifests/tenant-control-planes/tcp-custom.yaml
-   ```
-
-2. Edit the manifest (change `metadata.name` and labels)
-
-3. Apply:
-   ```bash
-   kubectl apply -f manifests/tenant-control-planes/tcp-custom.yaml
-   ```
-
-4. Wait for ready:
-   ```bash
-   kubectl wait --for=condition=Ready tenantcontrolplane tcp-custom --timeout=600s
-   ```
-
-5. Extract kubeconfig:
-   ```bash
-   ./scripts/06-extract-kubeconfig.sh tcp-custom
-   ```
-
-### Cleanup
-
-Remove everything:
+### Step 7: Access Applications
 
 ```bash
+# Use the EXTERNAL-IP from step 6
+curl http://<EXTERNAL-IP>
+
+# Or open in browser: http://<EXTERNAL-IP>
+```
+
+**Expected:**
+- Dev: Purple page "DEVELOPMENT Environment"
+- Staging: Pink page "STAGING Environment"
+- Prod: Blue page "PRODUCTION Environment"
+
+---
+
+## 🧹 Cleanup
+
+```bash
+# Remove everything (kind cluster + VMs)
 ./scripts/99-cleanup.sh
+
+# Or remove only worker VMs (keep control planes)
+./scripts/08-cleanup-workers.sh
 ```
 
-## Troubleshooting
+---
 
-See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for common issues and solutions.
+## 📚 Additional Info
 
-### Quick Diagnostics
+### Architecture
+
+```
+Host Machine
+├── kind Cluster (Management - Docker)
+│   ├── Kamaji Operator
+│   ├── cert-manager
+│   ├── MetalLB
+│   └── Tenant Control Planes (pods)
+│       ├── tcp-dev (API, etcd, scheduler, controller)
+│       ├── tcp-staging
+│       └── tcp-prod
+└── Worker VMs (libvirt/KVM)
+    ├── tcp-dev-worker → joins tcp-dev
+    ├── tcp-staging-worker → joins tcp-staging
+    └── tcp-prod-worker → joins tcp-prod
+```
+
+### What You Get
+
+- ✅ 3 isolated tenant Kubernetes clusters
+- ✅ Each with dedicated control plane (API server, etcd, scheduler)
+- ✅ Each with one worker node (VM) for running pods
+- ✅ LoadBalancer IPs for services
+- ✅ Demo nginx apps showing environment isolation
+- ✅ Full kubectl access to each tenant
+
+### Common Commands
 
 ```bash
-# Check all pods
-kubectl get pods -A
+# View all tenant control planes
+kubectl get tenantcontrolplanes
 
-# Check events
-kubectl get events -A --sort-by='.lastTimestamp'
+# Check control plane pods
+kubectl get pods -l 'kamaji.clastix.io/component=control-plane'
 
-# Check tenant control plane status
-kubectl describe tenantcontrolplane tcp-dev
+# View LoadBalancer IPs
+kubectl get svc -l 'kamaji.clastix.io/name'
 
-# Check Kamaji logs
-kubectl logs -n kamaji-system -l control-plane=controller-manager --tail=100
+# SSH into a worker VM
+vagrant ssh tcp-dev-worker
+
+# Check kubelet on worker
+vagrant ssh tcp-dev-worker -c "sudo systemctl status kubelet"
 ```
 
-## Resource Consumption
+---
 
-### Typical Usage (3 Tenant Control Planes)
-- **CPU**: ~2.5 cores total
-- **RAM**: ~5 GB total
-- **Disk**: ~10 GB
+## 🔧 Troubleshooting
 
-### Per Component
-- Management cluster: ~1 core, ~2 GB RAM
-- Per tenant control plane: ~0.5 cores, ~1 GB RAM
+**Full guide:** [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | [WORKER-SETUP.md](WORKER-SETUP.md)
 
-## Limitations
+**Quick fixes:**
 
-- **Local development only** - not suitable for production
-- **Single-node kind cluster** - no high availability
-- **Resource constraints** - limited by Docker resources
-- **No worker nodes** - tenant clusters have control planes only
+```bash
+# Pods stuck Pending? Workers not joined yet
+for tenant in dev staging prod; do ./scripts/join-worker.sh ${tenant}; done
 
-## Next Steps
+# "Too many open files"?
+sudo sysctl fs.inotify.max_user_instances=512
+sudo sysctl fs.inotify.max_user_watches=524288
+sudo systemctl restart libvirtd
 
-- **Add worker nodes**: Join worker nodes to tenant clusters
-- **Monitoring**: Add Prometheus/Grafana for observability
-- **GitOps**: Integrate with Flux for automated deployments
-- **Alternative datastores**: Try MySQL or PostgreSQL instead of etcd
+# Check logs
+kubectl logs -n kamaji-system -l control-plane=controller-manager --tail=50
+vagrant ssh tcp-dev-worker -c "sudo journalctl -u kubelet -n 50"
+```
 
-## References
+---
+
+## 📖 References
 
 - [Kamaji Documentation](https://kamaji.clastix.io/)
-- [Kamaji on Kind Guide](https://kamaji.clastix.io/getting-started/kamaji-kind/)
 - [Kamaji GitHub](https://github.com/clastix/kamaji)
 - [kind Documentation](https://kind.sigs.k8s.io/)
-
-## License
-
-This project follows the same license as Kamaji (Apache 2.0).
+- [Vagrant Documentation](https://www.vagrantup.com/docs)
