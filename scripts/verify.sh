@@ -62,7 +62,8 @@ echo -e "${YELLOW}Tenant Control Planes:${NC}"
 for env in dev staging prod; do
     TCP_NAME="tcp-${env}"
     check "${TCP_NAME} exists" "kubectl get tenantcontrolplane ${TCP_NAME}"
-    check "${TCP_NAME} ready" "kubectl get tenantcontrolplane ${TCP_NAME} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' | grep -q True"
+    # Check if LoadBalancer service exists (indicates TCP is working)
+    check "${TCP_NAME} ready" "kubectl get svc -l kamaji.clastix.io/name=${TCP_NAME} -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' | grep -q '^[0-9]'"
 done
 echo ""
 
