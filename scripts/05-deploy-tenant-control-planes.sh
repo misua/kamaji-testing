@@ -40,14 +40,31 @@ for env in dev staging prod; do
     TCP_NAME="tcp-${env}"
     echo -e "${YELLOW}Waiting for ${TCP_NAME}...${NC}"
     
-    # Wait up to 10 minutes for Ready condition
-    kubectl wait --for=condition=Ready tenantcontrolplane "${TCP_NAME}" --timeout=600s || {
-        echo -e "${RED}✗ ${TCP_NAME} failed to become ready${NC}"
-        echo "Check status with: kubectl describe tenantcontrolplane ${TCP_NAME}"
-        continue
-    }
+    # Wait for TCP to show Ready status (max 5 minutes)
+    TIMEOUT=300
+    ELAPSED=0
+    while [ $ELAPSED -lt $TIMEOUT ]; do
+        STATUS=$(kubectl get tenantcontrolplane "${TCP_NAME}" -o jsonpath='{.status.kubeconfig.lastUpdate}' 2>/dev/null)
+        if [ -n "$STATUS" ]; then
+            # Check if LoadBalancer has external IP
+            EXTERNAL_IP=$(kubectl get svc -l "kamaji.clastix.io/name=${TCP_NAME}" -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+            if [ -n "$EXTERNAL_IP" ]; then
+                echo -e "${GREEN}✓ ${TCP_NAME} is ready (${EXTERNAL_IP})${NC}"
+                break
+            fi
+        fi
+        sleep 5
+        ELAPSED=$((ELAPSED + 5))
+        if [ $((ELAPSED % 30)) -eq 0 ]; then
+            echo -n " ${ELAPSED}s"
+        fi
+    done
+    echo ""
     
-    echo -e "${GREEN}✓ ${TCP_NAME} is ready${NC}"
+    if [ $ELAPSED -ge $TIMEOUT ]; then
+        echo -e "${YELLOW}⚠ ${TCP_NAME} took longer than expected${NC}"
+        echo "Check status: kubectl get tenantcontrolplane ${TCP_NAME}"
+    fi
 done
 
 echo ""
